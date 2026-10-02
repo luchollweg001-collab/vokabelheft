@@ -1,0 +1,19 @@
+{
+  "name": "Vokabelheft Spanisch",
+  "short_name": "Vokabeln",
+  "description": "Spanisch-Vokabeln eintragen und üben",
+  "lang": "de",
+  "start_url": "./?add",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#e9e4d8",
+  "theme_color": "#e9e4d8",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Neues Wort", "url": "./?add", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+  ]
+}

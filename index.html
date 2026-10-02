@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Vokabelheft Spanisch</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vokabeln">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#e9e4d8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1d22" media="(prefers-color-scheme: dark)">
+<style>
+  :root {
+    --bg: #e9e4d8;
+    --paper: #fffdf6;
+    --line: #c9d7ea;
+    --margin: #e8a0a0;
+    --ink: #1f2a44;
+    --muted: #6b7280;
+    --accent: #c0392b;
+    --ok: #1e8449;
+    --ok-bg: #e3f4e8;
+    --almost: #9a7d0a;
+    --almost-bg: #fdf3d0;
+    --typo: #b9590b;
+    --typo-bg: #fde6d3;
+    --wrong: #b03a2e;
+    --wrong-bg: #f9dedb;
+    --btn: #2c3e66;
+    --btn-ink: #fff;
+    --row-h: 44px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1d22;
+      --paper: #262a31;
+      --line: #364152;
+      --margin: #7a3b3b;
+      --ink: #e8e6e1;
+      --muted: #9aa0aa;
+      --ok: #6fd391;
+      --ok-bg: #1f3a2a;
+      --almost: #f0d264;
+      --almost-bg: #3a3420;
+      --typo: #f5a35c;
+      --typo-bg: #3d2a1b;
+      --wrong: #f08a7e;
+      --wrong-bg: #3e2220;
+      --btn: #4a6aa8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(80px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    justify-content: space-between; margin-bottom: 16px;
+  }
+  h1 { margin: 0; font-size: 1.6rem; font-family: Georgia, serif; }
+  h1 span { color: var(--accent); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button, select, input[type=text] {
+    font: inherit; font-size: 0.95rem;
+  }
+  button {
+    background: var(--btn); color: var(--btn-ink); border: 0; border-radius: 6px;
+    padding: 7px 12px; cursor: pointer;
+  }
+  button:hover { filter: brightness(1.12); }
+  button.ghost {
+    background: transparent; color: var(--ink); border: 1px solid var(--line);
+  }
+  button.small { padding: 3px 8px; font-size: 0.85rem; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  select, input[type=text] {
+    background: var(--paper); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+  }
+  .tabs { display: flex; gap: 0; }
+  .tabs button {
+    border-radius: 0; background: transparent; color: var(--ink);
+    border: 1px solid var(--btn);
+  }
+  .tabs button:first-child { border-radius: 6px 0 0 6px; }
+  .tabs button:last-child { border-radius: 0 6px 6px 0; }
+  .tabs button.active { background: var(--btn); color: var(--btn-ink); }
+
+  /* --- The book --- */
+  .book {
+    background: var(--paper);
+    border-radius: 4px 10px 10px 4px;
+    box-shadow: 0 2px 0 rgba(0,0,0,.05), 0 10px 30px rgba(0,0,0,.12);
+    position: relative;
+    padding: 0 0 12px;
+    overflow: hidden;
+  }
+  .book::before { /* red margin line */
+    content: ""; position: absolute; top: 0; bottom: 0; left: 36px;
+    border-left: 2px solid var(--margin); opacity: .7;
+  }
+  .book-head, .row {
+    display: grid; grid-template-columns: 36px 1fr 1fr 96px;
+    align-items: center; min-height: var(--row-h);
+    border-bottom: 1px solid var(--line);
+  }
+  .book-head {
+    font-family: Georgia, serif; font-weight: bold; font-size: 1.05rem;
+    min-height: 52px; border-bottom: 2px solid var(--line);
+  }
+  .cell { padding: 6px 12px; overflow-wrap: anywhere; }
+  .cell.es { border-left: 2px solid var(--line); }
+  .num { color: var(--muted); font-size: .8rem; text-align: center; }
+  .actions { display: flex; gap: 4px; justify-content: flex-end; padding-right: 8px; }
+  .row .cell { font-size: 1.05rem; }
+  .row input[type=text] { width: 100%; }
+  .empty { padding: 28px 16px 20px 52px; color: var(--muted); font-style: italic; }
+
+  .add-row { background: rgba(127,127,127,.06); }
+  .hint { color: var(--muted); font-size: .85rem; margin: 6px 0 0 52px; }
+
+  /* --- Accent bar --- */
+  .accents {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    margin: 14px 0; font-size: .9rem; color: var(--muted);
+  }
+  .accents button {
+    background: var(--paper); color: var(--ink); border: 1px solid var(--line);
+    min-width: 34px; padding: 4px 8px; font-size: 1.05rem;
+  }
+
+  /* --- Practice --- */
+  .score {
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+    margin: 0 0 12px; font-size: .95rem;
+  }
+  .pill { padding: 2px 10px; border-radius: 999px; font-weight: 600; }
+  .pill.ok { background: var(--ok-bg); color: var(--ok); }
+  .pill.almost { background: var(--almost-bg); color: var(--almost); }
+  .pill.typo { background: var(--typo-bg); color: var(--typo); }
+  .pill.wrong { background: var(--wrong-bg); color: var(--wrong); }
+  .row.res-ok { background: var(--ok-bg); }
+  .row.res-almost { background: var(--almost-bg); }
+  .row.res-typo { background: var(--typo-bg); }
+  .row.res-wrong { background: var(--wrong-bg); }
+  .feedback { font-size: .92rem; margin-top: 4px; line-height: 1.5; }
+  .feedback .label { font-weight: 600; }
+  .res-ok .label { color: var(--ok); }
+  .res-almost .label { color: var(--almost); }
+  .res-typo .label { color: var(--typo); }
+  .res-wrong .label { color: var(--wrong); }
+  mark.fix { background: var(--ok); color: var(--paper); border-radius: 2px; padding: 0 1px; }
+  mark.bad { background: var(--wrong); color: var(--paper); border-radius: 2px; padding: 0 1px; text-decoration: line-through; }
+  mark.miss { background: transparent; color: var(--wrong); font-weight: bold; }
+  .given { color: var(--muted); }
+
+  @media (max-width: 600px) {
+    .book-head, .row { grid-template-columns: 28px 1fr 1fr; }
+    .book::before { left: 28px; }
+    .actions { grid-column: 2 / 4; padding: 0 8px 6px; }
+    .book-head .actions { display: none; }
+    .hint, .empty { margin-left: 40px; padding-left: 0; }
+  }
+  .hidden { display: none !important; }
+
+  /* --- Streak & "Verstanden" --- */
+  .streak { letter-spacing: 2px; font-size: .8rem; color: var(--ok); white-space: nowrap; }
+  .streak .off { color: var(--line); }
+  .section-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px 10px 52px; min-height: var(--row-h);
+    font-family: Georgia, serif; font-weight: bold; color: var(--ok);
+    border-bottom: 2px solid var(--line); border-top: 2px solid var(--line);
+    background: var(--ok-bg); cursor: pointer; user-select: none;
+  }
+  .section-head .given { font-family: inherit; font-weight: normal; font-size: .85rem; }
+  .row.mastered .cell { color: var(--muted); }
+
+  /* --- Duplicate warning --- */
+  .msg {
+    margin: 8px 12px 0 52px; padding: 8px 12px; border-radius: 6px;
+    background: var(--wrong-bg); color: var(--wrong); font-size: .92rem;
+  }
+
+  /* --- Overview --- */
+  #overviewView .book-head, #overviewView .row { grid-template-columns: 36px 1fr 1fr 150px; }
+  .letter {
+    padding: 14px 12px 4px 52px; font-family: Georgia, serif; font-size: 1.4rem;
+    font-weight: bold; color: var(--accent); border-bottom: 2px solid var(--line);
+  }
+  .meta { font-size: .8rem; color: var(--muted); padding-right: 10px; text-align: right; line-height: 1.4; }
+  @media (max-width: 600px) {
+    #overviewView .book-head, #overviewView .row { grid-template-columns: 28px 1fr 1fr; }
+    .meta { grid-column: 2 / 4; text-align: left; padding: 0 12px 6px; }
+    .letter, .msg { margin-left: 40px; padding-left: 0; }
+    .msg { padding-left: 12px; }
+  }
+  @media (max-width: 600px) { .section-head { padding-left: 40px; } }
+
+  /* --- Account / sync --- */
+  .account { display: flex; align-items: center; gap: 10px; font-size: .85rem; color: var(--muted); margin-bottom: 12px; flex-wrap: wrap; }
+  .account .email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .sync { font-weight: 600; }
+  .sync.ok { color: var(--ok); }
+  .sync.pending { color: var(--almost); }
+  .sync.offline, .sync.error { color: var(--wrong); }
+
+  /* --- Login --- */
+  .auth {
+    max-width: 380px; margin: 8vh auto 0; background: var(--paper); border-radius: 10px;
+    padding: 28px 24px; box-shadow: 0 10px 30px rgba(0,0,0,.12);
+  }
+  .auth h1 { margin-bottom: 6px; }
+  .auth p { color: var(--muted); margin: 0 0 18px; font-size: .95rem; }
+  .auth label { display: block; font-size: .85rem; color: var(--muted); margin: 12px 0 4px; }
+  .auth input { width: 100%; }
+  .auth .buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+  .auth .link { background: none; color: var(--btn); padding: 4px; text-decoration: underline; }
+  .auth .msg { margin: 14px 0 0; }
+  .auth .msg.info { background: var(--ok-bg); color: var(--ok); }
+  .loading { text-align: center; color: var(--muted); margin-top: 20vh; }
+
+  /* --- Add form on top --- */
+  .add-row { border-bottom: 2px solid var(--line); }
+  .add-title { padding: 10px 12px 0 52px; font-weight: bold; font-family: Georgia, serif; }
+  .hint { margin-bottom: 8px; }
+
+  /* --- Phone / touch --- */
+  @media (max-width: 600px) {
+    input[type=text], input[type=email], input[type=password], select { font-size: 16px; } /* stops iOS zoom */
+    .add-title { padding-left: 40px; }
+    .add-row .actions button { width: 100%; padding: 10px; }
+    h1 { font-size: 1.35rem; }
+    .tabs { width: 100%; }
+    .tabs button { flex: 1; padding: 9px 4px; }
+  }
+  @media (pointer: coarse) {
+    button { min-height: 40px; }
+    .accents button { min-width: 42px; }
+  }
+  input[type=email], input[type=password] {
+    font: inherit; background: var(--paper); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="loading" id="loadingView">Lade…</div>
+
+<div class="wrap hidden" id="setupView">
+  <div class="auth">
+    <h1>Vokabelheft <span>Español</span></h1>
+    <p>Die Online-Speicherung ist noch nicht eingerichtet: In <code>firebase-config.js</code> fehlt die Firebase-Konfiguration.</p>
+  </div>
+</div>
+
+<div class="wrap hidden" id="authView">
+  <form class="auth" id="authForm" autocomplete="on">
+    <h1>Vokabelheft <span>Español</span></h1>
+    <p>Melde dich an, damit deine Vokabeln auf Handy und Computer gleich sind.</p>
+    <label for="authEmail">E-Mail</label>
+    <input type="email" id="authEmail" autocomplete="username" required>
+    <label for="authPass">Passwort</label>
+    <input type="password" id="authPass" autocomplete="current-password" minlength="6" required>
+    <div class="buttons">
+      <button type="submit" id="loginBtn">Anmelden</button>
+      <button type="button" class="ghost" id="signupBtn">Neues Konto erstellen</button>
+      <button type="button" class="link" id="resetBtn">Passwort vergessen?</button>
+    </div>
+    <div class="msg hidden" id="authMsg"></div>
+  </form>
+</div>
+
+<div class="wrap hidden" id="appView">
+  <div class="account">
+    <span class="sync" id="syncStatus"></span>
+    <span style="flex:1"></span>
+    <span class="email" id="userEmail"></span>
+    <button class="ghost small" id="logoutBtn">Abmelden</button>
+  </div>
+  <header>
+    <h1>Vokabelheft <span>Español</span></h1>
+    <div class="tabs">
+      <button id="tabEdit" class="active">✏️ Bearbeiten</button>
+      <button id="tabPractice">🎯 Üben</button>
+      <button id="tabOverview">📖 Übersicht</button>
+    </div>
+  </header>
+
+  <div class="toolbar" style="margin-bottom:14px">
+    <label for="listSelect">Liste:</label>
+    <select id="listSelect"></select>
+    <button class="ghost small" id="newListBtn">+ Neue Liste</button>
+    <span id="newListBox" class="hidden">
+      <input type="text" id="newListName" placeholder="z. B. Lektion 2" size="14">
+      <button class="small" id="newListSave">OK</button>
+    </span>
+    <button class="ghost small" id="renameListBtn">Umbenennen</button>
+    <button class="ghost small" id="deleteListBtn">Liste löschen</button>
+    <span style="flex:1"></span>
+    <button class="ghost small" id="exportBtn">⬇ Export</button>
+    <button class="ghost small" id="importBtn">⬆ Import</button>
+    <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+  </div>
+
+  <div class="accents" id="accentBar">
+    Sonderzeichen:
+  </div>
+
+  <!-- EDIT MODE -->
+  <section id="editView">
+    <div class="book">
+      <div class="book-head">
+        <div></div>
+        <div class="cell">🇩🇪 Deutsch</div>
+        <div class="cell es">🇪🇸 Spanisch</div>
+        <div class="actions"></div>
+      </div>
+      <div class="add-title">➕ Neues Wort</div>
+      <form class="row add-row" id="addForm" autocomplete="off">
+        <div class="num">+</div>
+        <div class="cell"><input type="text" id="addDe" placeholder="Deutsches Wort" enterkeyhint="next" autocapitalize="sentences"></div>
+        <div class="cell es"><input type="text" id="addEs" placeholder="Spanisches Wort" enterkeyhint="done" autocapitalize="off" spellcheck="false"></div>
+        <div class="actions"><button type="submit">Hinzufügen</button></div>
+      </form>
+      <div class="msg hidden" id="editMsg"></div>
+      <p class="hint">Tipp: Mehrere richtige Übersetzungen mit „/“ trennen, z. B. <em>el coche / el carro</em>.</p>
+      <div id="editRows"></div>
+    </div>
+  </section>
+
+  <!-- PRACTICE MODE -->
+  <section id="practiceView" class="hidden">
+    <div class="score" id="score"></div>
+    <div class="toolbar" style="margin-bottom:12px">
+      <select id="practiceSet" title="Welche Wörter üben?">
+        <option value="learn">Zu lernen</option>
+        <option value="mastered">Verstanden</option>
+        <option value="all">Alle</option>
+      </select>
+      <button id="restartBtn">↺ Neu starten</button>
+      <button class="ghost" id="shuffleBtn">🔀 Mischen</button>
+      <button class="ghost" id="mistakesBtn">Nur Fehler wiederholen</button>
+      <button class="ghost" id="checkAllBtn">Alle prüfen</button>
+    </div>
+    <div class="book">
+      <div class="book-head">
+        <div></div>
+        <div class="cell">🇩🇪 Deutsch</div>
+        <div class="cell es">🇪🇸 Spanisch</div>
+        <div class="actions"></div>
+      </div>
+      <div id="practiceRows"></div>
+    </div>
+  </section>
+
+  <!-- OVERVIEW: all words from all lists, A–Z -->
+  <section id="overviewView" class="hidden">
+    <div class="toolbar" style="margin-bottom:12px">
+      <label for="sortBy">Sortieren:</label>
+      <select id="sortBy">
+        <option value="de">Deutsch A–Z</option>
+        <option value="es">Spanisch A–Z</option>
+      </select>
+      <input type="text" id="search" placeholder="🔍 Suchen…" size="18" autocomplete="off">
+      <span class="given" id="overviewCount"></span>
+    </div>
+    <div class="book">
+      <div class="book-head">
+        <div></div>
+        <div class="cell" id="ovHeadA">🇩🇪 Deutsch</div>
+        <div class="cell es" id="ovHeadB">🇪🇸 Spanisch</div>
+        <div class="meta">Liste · Stand</div>
+      </div>
+      <div id="overviewRows"></div>
+    </div>
+  </section>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
