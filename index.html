@@ -249,6 +249,39 @@
     button { min-height: 40px; }
     .accents button { min-width: 42px; }
   }
+  /* --- Settings --- */
+  .settings {
+    background: var(--paper); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.12);
+  }
+  .set-head { display: flex; align-items: center; justify-content: space-between; }
+  .set-head h2 { margin: 0; font-family: Georgia, serif; font-size: 1.2rem; }
+  .set-block { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+  .set-block h3 { margin: 0 0 6px; font-size: 1rem; }
+  .set-block label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
+  .set-block label.check { color: var(--ink); font-size: .95rem; display: flex; gap: 8px; align-items: center; }
+  .set-block select, .set-block input[type=text] { width: 100%; max-width: 420px; }
+  .set-block > button { margin-top: 10px; }
+  .set-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .set-note { color: var(--muted); font-size: .85rem; margin: 10px 0 0; line-height: 1.45; }
+  .set-note.bad { color: var(--wrong); }
+  .set-note.good { color: var(--ok); }
+  a.button {
+    display: inline-flex; align-items: center; background: var(--btn); color: var(--btn-ink);
+    border-radius: 6px; padding: 7px 12px; text-decoration: none; font-size: .95rem;
+  }
+  a.button.small { padding: 3px 8px; font-size: .85rem; }
+  @media (pointer: coarse) { a.button { min-height: 40px; } }
+  .msg.info { background: var(--ok-bg); color: var(--ok); }
+
+  /* --- Speak buttons --- */
+  button.say {
+    background: none; color: var(--ink); border: 0; padding: 0 4px; margin-left: 4px;
+    font-size: 1rem; min-height: 0; vertical-align: baseline; opacity: .75;
+  }
+  button.say:hover { opacity: 1; filter: none; }
+  @media (pointer: coarse) { button.say { min-height: 32px; padding: 0 8px; } }
+
   input[type=email], input[type=password] {
     font: inherit; background: var(--paper); color: var(--ink);
     border: 1px solid var(--line); border-radius: 6px; padding: 8px;
@@ -287,8 +320,51 @@
     <span class="sync" id="syncStatus"></span>
     <span style="flex:1"></span>
     <span class="email" id="userEmail"></span>
+    <button class="ghost small" id="settingsBtn" title="Einstellungen">⚙️</button>
     <button class="ghost small" id="logoutBtn">Abmelden</button>
   </div>
+
+  <section class="settings hidden" id="settingsView">
+    <div class="set-head">
+      <h2>⚙️ Einstellungen</h2>
+      <button class="ghost small" id="settingsClose">Fertig</button>
+    </div>
+
+    <div class="set-block">
+      <h3>🔊 Vorlesen</h3>
+      <label for="voiceSelect">Stimme</label>
+      <select id="voiceSelect"></select>
+      <label for="rateSelect">Tempo</label>
+      <select id="rateSelect">
+        <option value="1">Normal</option>
+        <option value="0.7">Langsam</option>
+      </select>
+      <button class="ghost small" id="voiceTest" type="button">▶ Probe hören</button>
+      <p class="set-note" id="voiceNote">Eine venezolanische Stimme bietet Apple nicht an – automatisch wird die nächstbeste lateinamerikanische gewählt.
+        Natürlicher klingt es mit einer „Erweitert“-Stimme: iPhone-Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen → Spanisch.</p>
+    </div>
+
+    <div class="set-block">
+      <h3>🔔 Abend-Erinnerung</h3>
+      <label class="check"><input type="checkbox" id="remindOn"> Auf diesem Gerät erinnern, wenn ich noch nicht geübt habe</label>
+      <label for="remindHour">Uhrzeit</label>
+      <select id="remindHour"></select>
+      <p class="set-note" id="remindStatus"></p>
+    </div>
+
+    <div class="set-block">
+      <h3>⚡ Schnell-Knopf (Sperrbildschirm)</h3>
+      <p class="set-note">Mit dem Kurzbefehl „Vokabel“ trägst du Wörter ein, ohne die App zu öffnen. Er braucht deinen persönlichen Schnell-Schlüssel – behandle ihn wie ein Passwort.</p>
+      <label for="qaKey">Dein Schnell-Schlüssel</label>
+      <input type="text" id="qaKey" readonly placeholder="noch keiner erstellt">
+      <div class="set-buttons">
+        <button class="small" id="qaCopy" type="button">📋 Schlüssel kopieren</button>
+        <a class="button small" id="qaInstall" href="vokabel.shortcut" target="_blank" rel="noopener">⬇ Kurzbefehl installieren</a>
+        <button class="ghost small" id="qaNew" type="button">Neuen Schlüssel erzeugen</button>
+      </div>
+      <p class="set-note" id="qaStatus"></p>
+    </div>
+  </section>
   <header>
     <h1>Vokabelheft <span>Español</span></h1>
     <div class="tabs">

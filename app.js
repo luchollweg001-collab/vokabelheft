@@ -5,11 +5,12 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, writeBatch
+  collection, doc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, writeBatch
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
 const $ = id => document.getElementById(id);
+const START = new URLSearchParams(location.search);
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 
@@ -56,12 +57,16 @@ if (!configured) {
     user = u;
     state.words = []; state.lists = [];
     sync.error = null;
+    reminder = {}; quickToken = null; wordsLoaded = false; watchInbox(); // stops the old inbox listener
     if (!u) { show('authView'); return; }
     $('userEmail').textContent = u.email || '';
     show('appView');
     subscribe();
-    setMode('edit');
-    $('addDe').focus(); // opened from the home-screen icon (?add) → straight to "Neues Wort"
+    if (START.has('practice')) setMode('practice'); // tapped the evening reminder
+    else {
+      setMode('edit');
+      $('addDe').focus(); // opened from the home-screen icon (?add) → straight to "Neues Wort"
+    }
   });
 }
 
@@ -107,7 +112,17 @@ function subscribe() {
     sync.words = snap.metadata; renderSync();
     if (!snap.docChanges().length && state.words.length) return;
     state.words = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.created || 0) - (b.created || 0));
+    wordsLoaded = true;
     onDataChanged();
+  }, onSyncError));
+  unsubs.push(onSnapshot(reminderRef(), snap => {
+    reminder = snap.data() || {};
+    renderReminder();
+  }, onSyncError));
+  unsubs.push(onSnapshot(quickRef(), snap => {
+    const t = (snap.data() || {}).token || null;
+    if (t !== quickToken) { quickToken = t; watchInbox(); }
+    renderQuick();
   }, onSyncError));
 }
 function onSyncError(err) {
@@ -123,6 +138,7 @@ function write(promise) {
 
 function onDataChanged() {
   if (!listsLoaded) return;
+  processInbox();
   if (!state.lists.some(l => l.id === state.currentList)) setCurrentList(state.lists[0].id);
   renderLists();
   if (mode === 'edit') {
@@ -147,6 +163,265 @@ async function dbBatch(ops) { // ops: [(batch) => void]; Firestore allows 500 pe
     const b = writeBatch(db);
     ops.slice(i, i + 400).forEach(op => op(b));
     await write(b.commit());
+  }
+}
+
+/* ================= Read aloud ================= */
+// Apple has no Venezuelan voice; prefer other Latin-American voices, then Spain, then any Spanish voice.
+const VOICE_KEY = 'vokabelheft-voice', RATE_KEY = 'vokabelheft-rate';
+const LANG_PREF = ['es-VE', 'es-CO', 'es-419', 'es-US', 'es-MX', 'es-PE', 'es-CL', 'es-AR', 'es-ES'];
+const canSpeak = 'speechSynthesis' in window;
+let voices = [];
+
+const langOf = v => v.lang.replace('_', '-');
+function loadVoices() {
+  voices = canSpeak ? speechSynthesis.getVoices().filter(v => /^es(-|_|$)/i.test(v.lang)) : [];
+  renderVoices();
+}
+function autoVoice() {
+  const rank = v => {
+    const i = LANG_PREF.indexOf(langOf(v));
+    // "Enhanced"/"Premium" voices sound much better, so they win within the same accent
+    return (i < 0 ? LANG_PREF.length : i) * 10 + (/enhanced|premium|erweitert|verbessert/i.test(v.name) ? 0 : 1);
+  };
+  return voices.slice().sort((a, b) => rank(a) - rank(b))[0] || null;
+}
+function pickVoice() {
+  return voices.find(v => v.voiceURI === lsGet(VOICE_KEY)) || autoVoice();
+}
+function speak(text) {
+  if (!canSpeak || !text) return;
+  speechSynthesis.cancel();
+  const v = pickVoice();
+  // "el coche / el carro" → read both, with the natural pause between utterances
+  for (const part of text.split(/[\/;]/).map(t => t.trim()).filter(Boolean)) {
+    const u = new SpeechSynthesisUtterance(part);
+    u.lang = v ? v.lang : 'es-ES';
+    if (v) u.voice = v;
+    u.rate = Number(lsGet(RATE_KEY) || 1) * 0.95;
+    speechSynthesis.speak(u);
+  }
+}
+const sayBtn = es => canSpeak ? `<button type="button" class="say" data-say="${esc(es)}" title="Vorlesen" aria-label="Vorlesen">🔊</button>` : '';
+document.addEventListener('click', e => {
+  const b = e.target.closest('button.say');
+  if (b) { e.stopPropagation(); speak(b.dataset.say); }
+}, true);
+
+function renderVoices() {
+  const sel = $('voiceSelect');
+  if (!voices.length) {
+    sel.innerHTML = '<option value="">Keine spanische Stimme gefunden</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  const auto = autoVoice();
+  const saved = lsGet(VOICE_KEY);
+  sel.innerHTML = `<option value="">Automatisch (${esc(auto.name)}, ${esc(langOf(auto))})</option>` +
+    voices.slice().sort((a, b) => langOf(a).localeCompare(langOf(b)) || a.name.localeCompare(b.name))
+      .map(v => `<option value="${esc(v.voiceURI)}" ${v.voiceURI === saved ? 'selected' : ''}>${esc(v.name)} (${esc(langOf(v))})</option>`).join('');
+}
+if (canSpeak) {
+  loadVoices();
+  speechSynthesis.addEventListener?.('voiceschanged', loadVoices); // iOS loads the voice list late
+}
+$('voiceSelect').onchange = e => lsSet(VOICE_KEY, e.target.value);
+$('rateSelect').value = lsGet(RATE_KEY) || '1';
+$('rateSelect').onchange = e => lsSet(RATE_KEY, e.target.value);
+$('voiceTest').onclick = () => speak('¡Hola! ¿Cómo estás? Vamos a aprender vocabulario.');
+
+/* ================= Settings panel ================= */
+$('settingsBtn').onclick = () => {
+  $('settingsView').classList.toggle('hidden');
+  if (!$('settingsView').classList.contains('hidden')) { loadVoices(); renderReminder(); renderQuick(); }
+};
+$('settingsClose').onclick = () => $('settingsView').classList.add('hidden');
+
+/* ================= Evening reminder (Web Push) ================= */
+// The push itself is sent by a GitHub Action (reminder/send.js) every hour.
+// It reads users/{uid}/settings/reminder: { hour, tz, subs: {deviceKey: subscription}, lastPracticed, lastSent }
+const VAPID_PUBLIC = 'BMThq7bjYmZEtwSWEj7p4vDA8df1OWtFSuukwomBAggQnoMsZQcI3geZDBavihGzPEx00zDAxvj2H67k_-Rl1sE';
+const DEFAULT_HOUR = 21;
+let reminder = {};
+const reminderRef = () => doc(db, 'users', user.uid, 'settings', 'reminder');
+const todayStr = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD in local time
+const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin';
+
+$('remindHour').innerHTML = Array.from({ length: 24 }, (_, h) => `<option value="${h}">${String(h).padStart(2, '0')}:00</option>`).join('');
+
+function pushSupported() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+async function deviceSub() {
+  if (!pushSupported()) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+async function subKey(sub) {
+  const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sub.endpoint));
+  return [...new Uint8Array(h)].slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function b64ToBytes(b64) {
+  const s = atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(s, c => c.charCodeAt(0));
+}
+function remindStatus(text, cls) {
+  const el = $('remindStatus');
+  el.textContent = text;
+  el.className = 'set-note' + (cls ? ' ' + cls : '');
+}
+
+async function renderReminder() {
+  $('remindHour').value = String(reminder.hour ?? DEFAULT_HOUR);
+  if (!pushSupported()) {
+    $('remindOn').checked = false;
+    $('remindOn').disabled = true;
+    return remindStatus(/iPhone|iPad/.test(navigator.userAgent) && !isStandalone()
+      ? 'Mitteilungen gehen auf dem iPhone nur in der App vom Home-Bildschirm – öffne sie über das Symbol und schalte es dort ein.'
+      : 'Dieser Browser unterstützt keine Mitteilungen.', 'bad');
+  }
+  $('remindOn').disabled = false;
+  const sub = await deviceSub();
+  const on = !!(sub && reminder.subs && reminder.subs[await subKey(sub)]) && Notification.permission === 'granted';
+  $('remindOn').checked = on;
+  if (Notification.permission === 'denied')
+    remindStatus('Mitteilungen sind blockiert. Erlaube sie in den iPhone-Einstellungen → Mitteilungen → Vokabeln.', 'bad');
+  else if (on)
+    remindStatus(`An: Um ${String(reminder.hour ?? DEFAULT_HOUR).padStart(2, '0')}:00 kommt eine Erinnerung, wenn du heute noch nicht geübt hast` +
+      (reminder.lastPracticed === todayStr() ? ' – heute hast du schon geübt 👍' : '.'), 'good');
+  else remindStatus('Aus.');
+}
+
+$('remindOn').onchange = async e => {
+  const want = e.target.checked;
+  try {
+    if (want) {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { e.target.checked = false; return renderReminder(); }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = (await reg.pushManager.getSubscription()) ||
+        await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC) });
+      const key = await subKey(sub);
+      reminder = { ...reminder, hour: reminder.hour ?? DEFAULT_HOUR, tz: timeZone(), subs: { ...(reminder.subs || {}), [key]: sub.toJSON() } };
+      await write(setDoc(reminderRef(), { hour: reminder.hour, tz: reminder.tz, subs: { [key]: sub.toJSON() } }, { merge: true }));
+    } else {
+      const sub = await deviceSub();
+      if (sub) {
+        const key = await subKey(sub);
+        if (reminder.subs) delete reminder.subs[key];
+        await write(updateDoc(reminderRef(), { [`subs.${key}`]: deleteField() }));
+        await sub.unsubscribe();
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    e.target.checked = !want;
+    remindStatus('Hat nicht geklappt: ' + (err.message || err), 'bad');
+    return;
+  }
+  renderReminder();
+};
+$('remindHour').onchange = e => {
+  reminder.hour = Number(e.target.value);
+  write(setDoc(reminderRef(), { hour: reminder.hour, tz: timeZone() }, { merge: true }));
+  renderReminder();
+};
+// Called after every checked answer; writes at most once per day
+function markPracticed() {
+  const today = todayStr();
+  if (!user || reminder.lastPracticed === today) return;
+  reminder.lastPracticed = today;
+  write(setDoc(reminderRef(), { lastPracticed: today, tz: timeZone() }, { merge: true }));
+}
+
+/* ================= Quick add (lock-screen shortcut) ================= */
+// The shortcut posts {de, es} to inbox/{token}/items via the Firestore REST API (no login).
+// Rules only accept it if inboxTokens/{token} exists. The app moves the items into the word list.
+let quickToken = null, inboxUnsub = null, inboxDocs = [], wordsLoaded = false;
+const quickRef = () => doc(db, 'users', user.uid, 'settings', 'quickadd');
+const handledInbox = new Set();
+
+function renderQuick() {
+  $('qaKey').value = quickToken || '';
+  $('qaCopy').textContent = quickToken ? '📋 Schlüssel kopieren' : '🔑 Schlüssel erstellen';
+  $('qaNew').classList.toggle('hidden', !quickToken);
+}
+function qaStatus(text, cls) {
+  const el = $('qaStatus');
+  el.textContent = text;
+  el.className = 'set-note' + (cls ? ' ' + cls : '');
+}
+function randomToken() {
+  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from(crypto.getRandomValues(new Uint8Array(48)), b => abc[b % abc.length]).join('');
+}
+async function createToken() {
+  const t = randomToken(), old = quickToken;
+  const b = writeBatch(db);
+  b.set(doc(db, 'inboxTokens', t), { uid: user.uid, created: Date.now() });
+  b.set(quickRef(), { token: t });
+  if (old) b.delete(doc(db, 'inboxTokens', old)); // the old key stops working immediately
+  quickToken = t;
+  watchInbox();
+  renderQuick();
+  await write(b.commit());
+  return t;
+}
+$('qaCopy').onclick = async () => {
+  try {
+    const t = quickToken || await createToken();
+    await navigator.clipboard.writeText(t);
+    qaStatus('✓ Kopiert. Tippe jetzt auf „Kurzbefehl installieren“ und füge den Schlüssel ein, wenn das iPhone danach fragt.', 'good');
+  } catch (err) {
+    qaStatus('Kopieren ging nicht – markiere den Schlüssel im Feld oben und kopiere ihn von Hand.', 'bad');
+  }
+};
+$('qaNew').onclick = async () => {
+  if (!confirm('Neuen Schlüssel erzeugen? Der alte funktioniert dann nicht mehr – du musst ihn im Kurzbefehl ersetzen.')) return;
+  await createToken();
+  qaStatus('Neuer Schlüssel erstellt. Öffne den Kurzbefehl „Vokabel“ (Kurzbefehle-App → ⋯) und ersetze den alten Schlüssel im ersten Textfeld.', 'good');
+};
+
+function watchInbox() {
+  if (inboxUnsub) { inboxUnsub(); inboxUnsub = null; }
+  inboxDocs = [];
+  if (!quickToken || !user) return;
+  inboxUnsub = onSnapshot(collection(db, 'inbox', quickToken, 'items'), snap => {
+    inboxDocs = snap.docs;
+    processInbox();
+  }, err => console.error('inbox', err));
+}
+// Move words from the shortcut into the current list (same duplicate rule as typing them in)
+function processInbox() {
+  if (!listsLoaded || !wordsLoaded || !inboxDocs.length) return;
+  const todo = inboxDocs.filter(d => !handledInbox.has(d.id));
+  if (!todo.length) return;
+  const ops = [], added = [], skipped = [];
+  let t = Date.now();
+  for (const d of todo) {
+    handledInbox.add(d.id);
+    const de = String(d.data().de || '').trim(), es = String(d.data().es || '').trim();
+    const ref = d.ref;
+    ops.push(b => b.delete(ref));
+    if (!de || !es) continue;
+    if (findDuplicate(de, es)) { skipped.push(de); continue; }
+    // Id from the inbox item, so two open devices can't add the same word twice
+    const w = { id: 'qa_' + d.id, de, es, list: state.currentList, streak: 0, mastered: false, created: t++ };
+    state.words.push(w);
+    const wref = doc(wordsCol(), w.id);
+    ops.push(b => b.set(wref, { de, es, list: w.list, streak: 0, mastered: false, created: w.created }));
+    added.push(de);
+  }
+  dbBatch(ops);
+  if (added.length || skipped.length) {
+    const box = $('editMsg');
+    box.className = 'msg info';
+    box.textContent = (added.length ? `⚡ ${added.length} Wort${added.length > 1 ? 'e' : ''} vom Schnell-Knopf hinzugefügt: ${added.join(', ')}.` : '') +
+      (skipped.length ? ` ${skipped.length} übersprungen (gibt es schon): ${skipped.join(', ')}.` : '');
+    renderAll();
   }
 }
 
@@ -382,7 +657,7 @@ function editRow(w, i) {
       <div class="row ${w.mastered ? 'mastered' : ''}" data-id="${w.id}">
         <div class="num">${i + 1}</div>
         <div class="cell">${esc(w.de)}</div>
-        <div class="cell es">${esc(w.es)}${w.mastered ? '' : `<br>${streakDots(w)}`}</div>
+        <div class="cell es">${esc(w.es)}${sayBtn(w.es)}${w.mastered ? '' : `<br>${streakDots(w)}`}</div>
         <div class="actions">
           ${w.mastered ? '<button class="small ghost" data-act="unlearn" title="Zurück zu „Zu lernen“">↩</button>' : ''}
           <button class="small ghost" data-act="edit" title="Bearbeiten">✎</button>
@@ -439,6 +714,7 @@ function showDuplicate(w) {
   const list = state.lists.find(l => l.id === w.list);
   const where = w.list === state.currentList ? 'in dieser Liste' : `in „${list ? list.name : '?'}“`;
   const box = $('editMsg');
+  box.className = 'msg';
   box.innerHTML = `⚠️ Gibt es schon ${esc(where)}: <b>${esc(w.de)}</b> – <b>${esc(w.es)}</b>`;
   box.classList.remove('hidden');
 }
@@ -511,7 +787,7 @@ function renderPractice() {
         <div class="cell">${esc(w.de)}<br>${w.mastered && !practice.newlyMastered[id] ? '<span class="streak">✅ verstanden</span>' : streakDots(w)}</div>
         <div class="cell es">
           <input type="text" class="answer" value="${esc(val)}" placeholder="…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next">
-          ${fb ? `<div class="feedback">${fb}</div>` : ''}
+          ${fb ? `<div class="feedback">${fb}${sayBtn(w.es)}</div>` : ''}
         </div>
         <div class="actions"><button class="small ghost" data-act="check">Prüfen</button></div>
       </div>`;
@@ -549,6 +825,7 @@ function checkRow(id) {
     w.mastered = false;
   }
   dbUpdateWord(id, { streak: w.streak, mastered: !!w.mastered });
+  markPracticed();
   renderLists();
 }
 function focusNextOpen(fromIndex) {
@@ -646,8 +923,8 @@ function renderOverview() {
     html += `
       <div class="row ${w.mastered ? 'mastered' : ''}">
         <div class="num">${i + 1}</div>
-        <div class="cell">${esc(w[by])}</div>
-        <div class="cell es">${esc(w[other])}</div>
+        <div class="cell">${esc(w[by])}${by === 'es' ? sayBtn(w.es) : ''}</div>
+        <div class="cell es">${esc(w[other])}${other === 'es' ? sayBtn(w.es) : ''}</div>
         <div class="meta">${esc(listName[w.list] || '')}<br>${w.mastered ? '✅ verstanden' : streakDots(w)}</div>
       </div>`;
   });

@@ -1,0 +1,10 @@
+{
+  "name": "vokabelheft-reminder",
+  "private": true,
+  "type": "module",
+  "description": "Sends the evening 'practise your vocabulary' push notification",
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "web-push": "^3.6.7"
+  }
+}
