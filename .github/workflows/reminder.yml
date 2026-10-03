@@ -1,0 +1,44 @@
+name: Abend-Erinnerung
+
+on:
+  schedule:
+    - cron: '7 * * * *'   # every hour; the script decides who is due
+  workflow_dispatch:
+    inputs:
+      test:
+        description: 'Test-Mitteilung sofort an alle Geräte senden'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: write   # for the keep-alive step
+
+concurrency: reminder
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        working-directory: reminder
+        run: npm install --no-audit --no-fund --loglevel=error
+      - name: Send reminders
+        working-directory: reminder
+        run: node send.js
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          TEST: ${{ inputs.test }}
+      # GitHub pauses scheduled workflows after 60 days without repo activity; re-enabling resets that.
+      - name: Keep schedule alive
+        if: github.event_name == 'schedule'
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/reminder.yml/enable"
+        env:
+          GH_TOKEN: ${{ github.token }}
