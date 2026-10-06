@@ -1,7 +1,8 @@
 // Runs every hour (GitHub Actions). For each user with a reminder subscription:
 // send a push if it is past their reminder hour, they haven't practised today
 // and we haven't already reminded them today. TEST=true sends to everyone right away.
-import admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import webpush from 'web-push';
 
 const { FIREBASE_SERVICE_ACCOUNT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY } = process.env;
@@ -12,8 +13,8 @@ if (!FIREBASE_SERVICE_ACCOUNT || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
   process.exit(0);
 }
 
-admin.initializeApp({ credential: admin.credential.cert(JSON.parse(FIREBASE_SERVICE_ACCOUNT)) });
-const db = admin.firestore();
+initializeApp({ credential: cert(JSON.parse(FIREBASE_SERVICE_ACCOUNT)) });
+const db = getFirestore();
 webpush.setVapidDetails('https://luchollweg001-collab.github.io/vokabelheft/', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 const localDate = (tz, d) => d.toLocaleDateString('sv-SE', { timeZone: tz });
@@ -52,7 +53,7 @@ for (const d of snap.docs) {
     } catch (err) {
       console.log(`Push an Gerät ${key} fehlgeschlagen: ${err.statusCode} ${err.body || err.message}`);
       // Subscription expired or the app was removed from the home screen
-      if (err.statusCode === 404 || err.statusCode === 410) update[`subs.${key}`] = admin.firestore.FieldValue.delete();
+      if (err.statusCode === 404 || err.statusCode === 410) update[`subs.${key}`] = FieldValue.delete();
     }
   }
   if (!TEST) update.lastSent = today;
